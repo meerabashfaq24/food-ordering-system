@@ -55,7 +55,7 @@ export default function Admin() {
       const response = await api.get("/orders");
 
       setOrders(response.data.data || []);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Admin orders error:", err);
 
       setError(
@@ -96,7 +96,7 @@ export default function Admin() {
             : order
         )
       );
-    } catch (err) {
+    } catch (err: any) {
       console.error("Update status error:", err);
 
       setError(

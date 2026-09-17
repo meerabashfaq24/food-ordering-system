@@ -17,27 +17,23 @@ export default function ProductCard({
   const { user } = useAuth();
 
   const addToCart = async () => {
-    if (!user) {
-      navigate("/login");
-      return;
-    }
+  if (!user) {
+    navigate("/login");
+    return;
+  }
 
-    try {
-      await api.post("/cart/items", {
-        productId: product._id,
-        quantity: 1,
-      });
+  try {
+    await api.post("/cart/items", {
+      productId: product._id,
+      quantity: 1,
+    });
 
-      alert("Added to cart!");
-      onCartChange?.();
-    } catch (error) {
-      alert(
-        error?.response?.data?.message ||
-          "Unable to add product to cart."
-      );
-    }
-  };
-
+    alert("Added to cart!");
+    onCartChange?.();
+  } catch (error) {
+    console.error("Failed to add item to cart:", error);
+  }
+};
   return (
     <article className="product-card">
       <div
