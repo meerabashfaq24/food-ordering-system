@@ -1,0 +1,371 @@
+import { Response } from "express";
+import mongoose from "mongoose";
+import Cart from "../models/Cart";
+import Product from "../models/Product";
+import { AuthenticatedRequest } from "../middleware/authMiddleware";
+import { ApiResponse } from "../types";
+
+export const getCart = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      } satisfies ApiResponse<never>);
+      return;
+    }
+
+    let cart = await Cart.findOne({
+      user: userId,
+    }).populate("items.product");
+
+    if (!cart) {
+      cart = await Cart.create({
+        user: userId,
+        items: [],
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Cart retrieved successfully.",
+      data: cart,
+    } satisfies ApiResponse<typeof cart>);
+  } catch (error) {
+    console.error("Get cart error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to retrieve cart.",
+    } satisfies ApiResponse<never>);
+  }
+};
+
+export const addToCart = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { productId, quantity } = req.body;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      } satisfies ApiResponse<never>);
+      return;
+    }
+
+    if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
+      res.status(400).json({
+        success: false,
+        message: "Valid product ID is required.",
+      } satisfies ApiResponse<never>);
+      return;
+    }
+
+    const requestedQuantity = quantity === undefined
+      ? 1
+      : Number(quantity);
+
+    if (
+      !Number.isInteger(requestedQuantity) ||
+      requestedQuantity < 1
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "Quantity must be a positive whole number.",
+      } satisfies ApiResponse<never>);
+      return;
+    }
+
+    const product = await Product.findById(productId);
+
+    if (!product || !product.isAvailable) {
+      res.status(404).json({
+        success: false,
+        message: "Product not found.",
+      } satisfies ApiResponse<never>);
+      return;
+    }
+
+    if (product.stock < requestedQuantity) {
+      res.status(400).json({
+        success: false,
+        message: `Only ${product.stock} item(s) available.`,
+      } satisfies ApiResponse<never>);
+      return;
+    }
+
+    let cart = await Cart.findOne({
+      user: userId,
+    });
+
+    if (!cart) {
+      cart = await Cart.create({
+        user: userId,
+        items: [],
+      });
+    }
+
+    const existingItem = cart.items.find(
+      (item) => item.product.toString() === String(productId)
+    );
+
+    if (existingItem) {
+      const newQuantity =
+        existingItem.quantity + requestedQuantity;
+
+      if (newQuantity > product.stock) {
+        res.status(400).json({
+          success: false,
+          message: `Only ${product.stock} item(s) available.`,
+        } satisfies ApiResponse<never>);
+        return;
+      }
+
+      existingItem.quantity = newQuantity;
+    } else {
+      cart.items.push({
+        product: product._id,
+        quantity: requestedQuantity,
+      });
+    }
+
+    await cart.save();
+
+    const populatedCart = await cart.populate(
+      "items.product"
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Product added to cart.",
+      data: populatedCart,
+    } satisfies ApiResponse<typeof populatedCart>);
+  } catch (error) {
+    console.error("Add to cart error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to add product to cart.",
+    } satisfies ApiResponse<never>);
+  }
+};
+
+export const updateCartItem = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { productId } = req.params;
+    const { quantity } = req.body;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      } satisfies ApiResponse<never>);
+      return;
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(String(productId))) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid product ID.",
+      } satisfies ApiResponse<never>);
+      return;
+    }
+
+    const newQuantity = Number(quantity);
+
+    if (!Number.isInteger(newQuantity) || newQuantity < 1) {
+      res.status(400).json({
+        success: false,
+        message: "Quantity must be a positive whole number.",
+      } satisfies ApiResponse<never>);
+      return;
+    }
+
+    const product = await Product.findById(productId);
+
+    if (!product || !product.isAvailable) {
+      res.status(404).json({
+        success: false,
+        message: "Product not found.",
+      } satisfies ApiResponse<never>);
+      return;
+    }
+
+    if (newQuantity > product.stock) {
+      res.status(400).json({
+        success: false,
+        message: `Only ${product.stock} item(s) available.`,
+      } satisfies ApiResponse<never>);
+      return;
+    }
+
+    const cart = await Cart.findOne({
+      user: userId,
+    });
+
+    if (!cart) {
+      res.status(404).json({
+        success: false,
+        message: "Cart not found.",
+      } satisfies ApiResponse<never>);
+      return;
+    }
+
+    const item = cart.items.find(
+      (cartItem) =>
+        cartItem.product.toString() === String(productId)
+    );
+
+    if (!item) {
+      res.status(404).json({
+        success: false,
+        message: "Product is not in the cart.",
+      } satisfies ApiResponse<never>);
+      return;
+    }
+
+    item.quantity = newQuantity;
+
+    await cart.save();
+
+    const populatedCart = await cart.populate(
+      "items.product"
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Cart updated successfully.",
+      data: populatedCart,
+    } satisfies ApiResponse<typeof populatedCart>);
+  } catch (error) {
+    console.error("Update cart error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to update cart.",
+    } satisfies ApiResponse<never>);
+  }
+};
+
+export const removeFromCart = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { productId } = req.params;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      } satisfies ApiResponse<never>);
+      return;
+    }
+
+    const cart = await Cart.findOne({
+      user: userId,
+    });
+
+    if (!cart) {
+      res.status(404).json({
+        success: false,
+        message: "Cart not found.",
+      } satisfies ApiResponse<never>);
+      return;
+    }
+
+    const originalLength = cart.items.length;
+
+    cart.items = cart.items.filter(
+      (item) =>
+        item.product.toString() !== String(productId)
+    );
+
+    if (cart.items.length === originalLength) {
+      res.status(404).json({
+        success: false,
+        message: "Product is not in the cart.",
+      } satisfies ApiResponse<never>);
+      return;
+    }
+
+    await cart.save();
+
+    const populatedCart = await cart.populate(
+      "items.product"
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Product removed from cart.",
+      data: populatedCart,
+    } satisfies ApiResponse<typeof populatedCart>);
+  } catch (error) {
+    console.error("Remove cart item error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to remove product from cart.",
+    } satisfies ApiResponse<never>);
+  }
+};
+
+export const clearCart = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      } satisfies ApiResponse<never>);
+      return;
+    }
+
+    const cart = await Cart.findOne({
+      user: userId,
+    });
+
+    if (!cart) {
+      res.status(404).json({
+        success: false,
+        message: "Cart not found.",
+      } satisfies ApiResponse<never>);
+      return;
+    }
+
+    cart.items = [];
+
+    await cart.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Cart cleared successfully.",
+      data: cart,
+    } satisfies ApiResponse<typeof cart>);
+  } catch (error) {
+    console.error("Clear cart error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to clear cart.",
+    } satisfies ApiResponse<never>);
+  }
+};
