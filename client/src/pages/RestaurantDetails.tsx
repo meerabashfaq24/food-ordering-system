@@ -11,7 +11,9 @@ import {
 
 import type { Cart as CartType } from "../types";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  "https://food-ordering-system-gtoe.onrender.com/api";
 
 interface Restaurant {
   _id: string;
