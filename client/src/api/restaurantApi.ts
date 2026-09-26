@@ -1,8 +1,4 @@
-import axios from "axios";
-
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  "https://food-ordering-system-gtoe.onrender.com/api";
+import api from "./api";
 
 export interface Restaurant {
   _id: string;
@@ -58,8 +54,8 @@ export const getRestaurants = async (params?: {
   page?: number;
   limit?: number;
 }) => {
-  const response = await axios.get<RestaurantResponse>(
-    `${API_URL}/restaurants`,
+  const response = await api.get<RestaurantResponse>(
+    "/restaurants",
     {
       params,
     }
@@ -71,8 +67,8 @@ export const getRestaurants = async (params?: {
 export const getRestaurantById = async (
   id: string
 ) => {
-  const response = await axios.get<RestaurantSingleResponse>(
-    `${API_URL}/restaurants/${id}`
+  const response = await api.get<RestaurantSingleResponse>(
+    `/restaurants/${id}`
   );
 
   return response.data;
@@ -81,8 +77,8 @@ export const getRestaurantById = async (
 export const getMyRestaurant = async (
   token: string
 ) => {
-  const response = await axios.get<RestaurantSingleResponse>(
-    `${API_URL}/restaurants/owner/me`,
+  const response = await api.get<RestaurantSingleResponse>(
+    "/restaurants/owner/me",
     {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -97,8 +93,8 @@ export const createRestaurant = async (
   data: RestaurantFormData,
   token: string
 ) => {
-  const response = await axios.post<RestaurantSingleResponse>(
-    `${API_URL}/restaurants`,
+  const response = await api.post<RestaurantSingleResponse>(
+    "/restaurants",
     data,
     {
       headers: {
@@ -114,8 +110,8 @@ export const updateMyRestaurant = async (
   data: Partial<RestaurantFormData>,
   token: string
 ) => {
-  const response = await axios.put<RestaurantSingleResponse>(
-    `${API_URL}/restaurants/owner/me`,
+  const response = await api.put<RestaurantSingleResponse>(
+    "/restaurants/owner/me",
     data,
     {
       headers: {
